@@ -24,6 +24,8 @@
 
 #include "RTIMULSM6DS33LIS3MDL.h"
 #include "RTIMUSettings.h"
+#include <iostream>
+#include <bitset>
 
 //  this sets the learning rate for compass running average calculation
 
@@ -63,12 +65,28 @@ bool RTIMULSM6DS33LIS3MDL::IMUInit()
 
     // work out gyro/accel address
 
-    if (m_settings->HALRead(LSM6DS33_ADDRESS0, LSM6DS33_WHO_AM_I, 1, &result, "")) {
-        if (result == LSM6DS33_ID) {
-            m_gyroAccelSlaveAddr = LSM6DS33_ADDRESS0;
+    if (!m_settings->HALRead(LSM6DS33_ADDRESS0, LSM6DS33_WHO_AM_I, 1, &result, "Reading WHO AM I on Addr0")) 
+    {
+        if (!m_settings->HALRead(LSM6DS33_ADDRESS1, LSM6DS33_WHO_AM_I, 1, &result, "Reading WHO AM I on Addr1"))
+        {
+            return false;
+        } 
+        else 
+        {
+            if (result == LSM6DS33_ID) 
+            {
+                m_gyroAccelSlaveAddr = LSM6DS33_ADDRESS1;
+                std::cout << "Addr1 " << LSM6DS33_ADDRESS1 << std::endl;
+            }
         }
-    } else {
-        m_gyroAccelSlaveAddr = LSM6DS33_ADDRESS1;
+    } 
+    else 
+    {
+        if (result == LSM6DS33_ID) 
+        {
+            m_gyroAccelSlaveAddr = LSM6DS33_ADDRESS0;
+            std::cout << "Addr0 " << LSM6DS33_ADDRESS0 << std::endl;
+        }
     }
 
     setCalibrationData();
@@ -80,25 +98,37 @@ bool RTIMULSM6DS33LIS3MDL::IMUInit()
 
     //  Set up the gyro/accel
 
-    if (!m_settings->HALWrite(m_gyroAccelSlaveAddr, LSM6DS33_CTRL3_C, 0x05, "Failed to reset LSM6DS33"))
+    // IF_INC = 1 (automatically increment address register)
+    if (!m_settings->HALWrite(m_gyroAccelSlaveAddr, LSM6DS33_CTRL3_C, 0x04, "Failed to set LSM6DS33 automatic register address increment"))
+    {
         return false;
+    } 
+    else 
+    {
+        std::cout << "Set LSM6DS33 automatic register address increment" << std::endl;
+    } 
 
-    if (!m_settings->HALWrite(m_gyroAccelSlaveAddr, LSM6DS33_CTRL3_C, 0x84, "Failed to boot LSM6DS33"))
-        return false;
+    //if (!m_settings->HALWrite(m_gyroAccelSlaveAddr, LSM6DS33_CTRL3_C, 0x84, "Failed to boot LSM6DS33"))
+    //    return false;
 
     if (!m_settings->HALRead(m_gyroAccelSlaveAddr, LSM6DS33_WHO_AM_I, 1, &result, "Failed to read LSM6DS33 id"))
         return false;
 
     if (result != LSM6DS33_ID) {
         HAL_ERROR1("Incorrect LSM6DS33 id %d\n", result);
+        HAL_ERROR1("LSM6DS33 true id is %d\n", LSM6DS33_ID);
         return false;
     }
 
     if (!setGyro())
-            return false;
-
-    if (!setAccel())
         return false;
+    
+    std::cout << "Setting Accel" << std::endl;
+    if (!setAccel())
+    {
+        std::cout << "Error Setting Accelerometer" << std::endl;
+        return false;
+    }
 
     //  Set up the compass
 
@@ -110,8 +140,15 @@ bool RTIMULSM6DS33LIS3MDL::IMUInit()
         return false;
     }
 
+    std::cout << "Set compass" << std::endl;
     if (!setCompass())
+    {
         return false;
+    }
+    else
+    {
+        std::cout << "Compass set" << std::endl;
+    }
 
 /*
 #ifdef LSM6DS33LIS3MDL_CACHE_MODE
@@ -122,7 +159,7 @@ bool RTIMULSM6DS33LIS3MDL::IMUInit()
         return false;
 #endif
 */
-
+    std::cout << "Calculating gyro bias" << std::endl;
     gyroBiasInit();
 
     HAL_INFO("LSM6DS33LIS3MDL init complete\n");
@@ -226,10 +263,16 @@ bool RTIMULSM6DS33LIS3MDL::setGyro()
 
     if (!m_settings->HALWrite(m_gyroAccelSlaveAddr, LSM6DS33_CTRL2_G, ctrl2_g, "Failed to set LSM6DS33 CTRL2_G"))
 	return false;
+    
+    std::cout << "Writing CTRL2_G " << static_cast<unsigned>(ctrl2_g) << std::endl;
+    
+    unsigned char regData;
+    m_settings->HALRead(m_gyroAccelSlaveAddr, LSM6DS33_CTRL2_G, 1, &regData, "Failed to read LSM6DS33 CTRL2_G");
 
+    std::cout << "Reading updated CTRL2_G " << static_cast<unsigned>(regData) << std::endl;
 
-
-    if ((m_settings->m_GD20HM303DGyroHpf < LSM6DS33_HPF_0) || (m_settings->m_LSM6DS33LIS3MDLGyroHpf > LSM6DS33_HPF_3)) {
+    if ((m_settings->m_GD20HM303DGyroHpf < LSM6DS33_HPF_0) || (m_settings->m_LSM6DS33LIS3MDLGyroHpf > LSM6DS33_HPF_3)) 
+    {
         HAL_ERROR1("Illegal LSM6DS33 high pass filter code %d\n", m_settings->m_LSM6DS33LIS3MDLGyroHpf);
         return false;
     }
@@ -239,10 +282,16 @@ bool RTIMULSM6DS33LIS3MDL::setGyro()
     unsigned char gyroHpf = m_settings->m_LSM6DS33LIS3MDLGyroHpf;
 
     // G_HM_MODE, HP_G_EN, HPCF_G1, HPCF_G0, HP_G_RST, ROUNDING_STATUS, 0, 0
-    unsigned char ctrl7_g = (powerMode<<7) | (hpgEn<<6) | (gyroHpf<<4) | 0x00;
-
+    unsigned char ctrl7_g = (powerMode<<7) | (hpgEn<<6) | (gyroHpf<<4) | 0x00;    
+ 
+    std::cout << "Writing CTRL7_G " << static_cast<unsigned>(ctrl7_g) << std::endl;
+    
     if (!m_settings->HALWrite(m_gyroAccelSlaveAddr, LSM6DS33_CTRL7_G, ctrl7_g, "Failed to set LSM6DS33 CTRL7_G"))
         return false;
+
+
+    std::cout << "LSM6DS33 Gyro set" << std::endl;
+    return true;
 }
 
 /*
@@ -271,7 +320,8 @@ bool RTIMULSM6DS33LIS3MDL::setAccel()
     unsigned char powerMode = 0;  // high speed enabled -> powerMode = 0, low power and normal mode -> powerMode = 1
 
 
-    if ((m_settings->m_GD20HM303DAccelSampleRate < 0) || (m_settings->m_GD20HM303DAccelSampleRate > 10)) {
+    if ((m_settings->m_GD20HM303DAccelSampleRate < 0) || (m_settings->m_GD20HM303DAccelSampleRate > 10)) 
+    {
         HAL_ERROR1("Illegal LSM303D accel sample rate code %d\n", m_settings->m_GD20HM303DAccelSampleRate);
         return false;
     }
@@ -346,22 +396,22 @@ bool RTIMULSM6DS33LIS3MDL::setAccel()
 
     switch (m_settings->m_LSM6DS33LIS3MDLAccelFsr) {
     case LSM6DS33_ACCEL_FSR_2:
-        ctrl1_xl |= 0x04;
+        ctrl1_xl |= (0x00<<2);
         m_accelScale = (RTFLOAT)0.000061;
         break;
 
-    case LSM6DS33_ACCEL_FSR_4:
-        ctrl1_xl |= 0x00;
+    case LSM6DS33_ACCEL_FSR_16:
+        ctrl1_xl |= (0x01<<2);
         m_accelScale = (RTFLOAT)0.000122;
         break;
 
-    case LSM6DS33_ACCEL_FSR_8:
-        ctrl1_xl |= 0x04;
+    case LSM6DS33_ACCEL_FSR_4:
+        ctrl1_xl |= (0x10<<2);
         m_accelScale = (RTFLOAT)0.000244;
         break;
 
-    case LSM6DS33_ACCEL_FSR_16:
-        ctrl1_xl |= 0x08;
+    case LSM6DS33_ACCEL_FSR_8:
+        ctrl1_xl |= (0x11<<2);
         m_accelScale = (RTFLOAT)0.000732;
         break;
 
@@ -393,24 +443,30 @@ bool RTIMULSM6DS33LIS3MDL::setAccel()
     if (!m_settings->HALWrite(m_gyroAccelSlaveAddr, LSM6DS33_CTRL1_XL, ctrl1_xl, "Failed to set LSM6DS33 CTRL1_XL"))
 	return false;
 
+    std::cout << "Writing LSM6DS33 CTRL1_XL: " << static_cast<unsigned>(ctrl1_xl) << std::endl;
 
-
-    if ((m_settings->m_LSM6DS33LIS3MDLAccelHpf < LSM6DS33_ACCEL_HPF_0) || (m_settings->m_LSM6DS33LIS3MDLAccelHpf > LSM6DS33_ACCEL_HPF_3)) {
+    if ((m_settings->m_LSM6DS33LIS3MDLAccelHpf < LSM6DS33_ACCEL_HPF_0) || (m_settings->m_LSM6DS33LIS3MDLAccelHpf > LSM6DS33_ACCEL_HPF_3)) 
+    {
         HAL_ERROR1("Illegal LSM6DS33 high pass filter code %d\n", m_settings->m_LSM6DS33LIS3MDLAccelHpf);
         return false;
     }
 
-    unsigned char LPF2_XL_EN = 1;
-    unsigned char HP_SLOPE_XL_EN = 1;
-    unsigned char LOW_PASS_ON_6D = 1;
+    unsigned char LPF2_XL_EN = 0;
+    unsigned char HP_SLOPE_XL_EN = 0;
+    unsigned char LOW_PASS_ON_6D = 0;
 
     unsigned char accelHpf = m_settings->m_LSM6DS33LIS3MDLAccelHpf;
 
     // LPF2_XL_EN, HPCF_XL1, HPCF_XL0, 0, 0, HP_SLOPE_XL_EN, 0, LOW_PASS_ON_6D
     unsigned char ctrl8_xl = (LPF2_XL_EN<<7) | (accelHpf<<5) | (HP_SLOPE_XL_EN<<2) | (HP_SLOPE_XL_EN<<0) | 0x00;
 
+    std::cout << "Writing LSM6DS33 CTRL8_XL: " << std::hex << static_cast<unsigned>(ctrl8_xl) << std::endl;
+
     if (!m_settings->HALWrite(m_gyroAccelSlaveAddr, LSM6DS33_CTRL8_XL, ctrl8_xl, "Failed to set LSM6DS33 CTRL8_XL"))
         return false;
+
+    std::cout << "LSM6DS33 Accel set" << std::endl;
+    return true;
 
 }
 
@@ -436,7 +492,9 @@ bool RTIMULSM6DS33LIS3MDL::setCompass()
     //write_reg(LIS3MDL_CTRL4, 0b00001100);
     if (!m_settings->HALWrite(m_compassSlaveAddr, LIS3MDL_CTRL4, 0b00001100, "Failed to set LIS3MDL CTRL4"))
         return false;
-
+    
+    std::cout << "LIS3MDL Compass set" << std::endl; 
+    return true;
 }
 
 /*
@@ -620,22 +678,62 @@ bool RTIMULSM6DS33LIS3MDL::IMURead()
     }
 */
 #else
+
+    // STATUS_REG
+    // -, -, -, -, EV_BOOT, TDA, GDA, XLDA
+    // EV_BOOT: Boot running flag signal. Default value: 0
+    //          0: no boot running; 1: boot running
+    // TDA:     Temperature new data available. Default value: 0
+    //          0: no set of data is available at temperature sensor output;
+    //          1: a new set of data is available at temperature sensor output
+    // GDA:     Gyroscope new data available. Default value: 0
+    //          0: no set of data available at gyroscope output
+    //          1: a new set of data is available at gyroscope sensor output
+    // XLDA:    Accelerometer new data available. Default value: 0
+    //          0: no set of data available at accelerometer output
+    //          1: a new set of data is available at accelerometer output
     if (!m_settings->HALRead(m_gyroAccelSlaveAddr, LSM6DS33_STATUS_REG, 1, &status, "Failed to read LSM6DS33 status"))
         return false;
-
+    /*
     if ((status & 0x8) == 0)
+    {
+        std::cout << "STATUS ERROR -> RETURN" << std::endl;
+        return false;
+    }
+    */
+
+    if (!m_settings->HALRead(m_gyroAccelSlaveAddr, LSM6DS33_OUTX_L_G, 6, gyroData, "Failed to read LSM6DS33 data"))
         return false;
 
-    if (!m_settings->HALRead(m_gyroAccelSlaveAddr, 0x80 | LSM6DS33_OUTX_L_G, 6, gyroData, "Failed to read LSM6DS33 data"))
-        return false;
+    /*
+    std::cout << "Gyro Data: "
+    << "  X " << static_cast<int16_t>(gyroData[0] | gyroData[1] << 8) 
+    << "; Y " << static_cast<int16_t>(gyroData[2] | gyroData[3] << 8)
+    << "; Z " << static_cast<int16_t>(gyroData[4] | gyroData[5] << 8) << std::endl;
+    */
 
     m_imuData.timestamp = RTMath::currentUSecsSinceEpoch();
 
-    if (!m_settings->HALRead(m_gyroAccelSlaveAddr, 0x80 | LSM6DS33_OUTX_L_XL, 6, accelData, "Failed to read LSM6DS33 accel data"))
+    if (!m_settings->HALRead(m_gyroAccelSlaveAddr, LSM6DS33_OUTX_L_XL, 6, accelData, "Failed to read LSM6DS33 accel data"))
         return false;
+    
+    /*
+    std::cout << "Accel Data: "
+    << "  X " << static_cast<int16_t>(accelData[0] | accelData[1] << 8) 
+    << "; Y " << static_cast<int16_t>(accelData[2] | accelData[3] << 8)
+    << "; Z " << static_cast<int16_t>(accelData[4] | accelData[5] << 8) << std::endl;
+    */
 
-    if (!m_settings->HALRead(m_compassSlaveAddr, 0x80 | LIS3MDL_OUT_X_L, 6, compassData, "Failed to read LIS3MDL compass data"))
-        return false;
+    //if (!m_settings->HALRead(m_compassSlaveAddr, 0x08 | LIS3MDL_OUT_X_L, 6, compassData, "Failed to read LIS3MDL compass data"))
+    //    return false;
+ 
+    /*
+    std::cout << "Compass Data: "
+    << "  X " << static_cast<int16_t>(compassData[0] | compassData[1] << 8) 
+    << "; Y " << static_cast<int16_t>(compassData[2] | compassData[3] << 8)
+    << "; Z " << static_cast<int16_t>(compassData[4] | compassData[5] << 8) << std::endl;
+    */
+
 
 #endif
 
@@ -655,13 +753,13 @@ bool RTIMULSM6DS33LIS3MDL::IMURead()
 
     //  sort out compass axes
 
-    m_imuData.compass.setY(-m_imuData.compass.y());
-    m_imuData.compass.setZ(-m_imuData.compass.z());
+    //m_imuData.compass.setY(-m_imuData.compass.y());
+    //m_imuData.compass.setZ(-m_imuData.compass.z());
 
     //  now do standard processing
 
     handleGyroBias();
-    calibrateAverageCompass();
+    //calibrateAverageCompass();
     calibrateAccel();
 
     //  now update the filter

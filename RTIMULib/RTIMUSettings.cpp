@@ -42,6 +42,8 @@
 #include "IMUDrivers/RTHumidityHTS221.h"
 #include "IMUDrivers/RTHumidityHTU21D.h"
 
+#include <iostream>
+
 #define RATE_TIMER_INTERVAL 2
 
 RTIMUSettings::RTIMUSettings(const char *productType)
@@ -311,9 +313,10 @@ bool RTIMUSettings::discoverIMU(int& imuType, bool& busIsI2C, unsigned char& sla
                 if (HALRead(LIS3MDL_ADDRESS1, LIS3MDL_WHO_AM_I, 1, &altResult, "")) {
                     if (altResult == LIS3MDL_ID) {
                         imuType = RTIMU_TYPE_LSM6DS33LIS3MDL;
-                        slaveAddress = L3GD20H_ADDRESS1;
+                        slaveAddress = LSM6DS33_ADDRESS1;
                         busIsI2C = true;
                         HAL_INFO("Detected LSM6DS33/LIS3MDL at option/option address\n");
+                        std::cout << "FOUND IMU LSM6DS33 and Result was " << static_cast<unsigned>(result) << " alt result was " << static_cast<unsigned>(altResult) << std::endl; 
                         return true;
                     }
                 }
@@ -323,6 +326,7 @@ bool RTIMUSettings::discoverIMU(int& imuType, bool& busIsI2C, unsigned char& sla
                         slaveAddress = LSM6DS33_ADDRESS1;
                         busIsI2C = true;
                         HAL_INFO("Detected LSM6DS33/LIS3MDL at option/standard address\n");
+                        std::cout << "FOUND IMU LIS3MDL and Result was " << static_cast<unsigned>(altResult) << std::endl; 
                         return true;
                     }
                 }
@@ -580,8 +584,8 @@ void RTIMUSettings::setDefaults()
     //  LSM6DS33LIS3MDL defaults
 
     m_LSM6DS33LIS3MDLGyroSampleRate = LSM6DS33_SAMPLERATE_1660;
-    m_LSM6DS33LIS3MDLGyroHpf = LSM6DS33_HPF_3;
-    m_LSM6DS33LIS3MDLGyroFsr = LSM6DS33_FSR_1000;
+    m_LSM6DS33LIS3MDLGyroHpf = LSM6DS33_HPF_0;
+    m_LSM6DS33LIS3MDLGyroFsr = LSM6DS33_FSR_2000;
 
     m_LSM6DS33LIS3MDLAccelSampleRate = LSM6DS33_ACCEL_SAMPLERATE_6660;
     m_LSM6DS33LIS3MDLAccelHpf = LSM6DS33_ACCEL_HPF_0;
