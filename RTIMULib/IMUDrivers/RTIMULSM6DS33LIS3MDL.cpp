@@ -249,7 +249,7 @@ bool RTIMULSM6DS33LIS3MDL::setGyro()
     switch (m_settings->m_LSM6DS33LIS3MDLGyroFsr) {
     case LSM6DS33_FSR_125:
         ctrl2_g |= 0x02;
-        m_gyroScale = (RTFLOAT)0.00875 * RTMATH_DEGREE_TO_RAD;
+        m_gyroScale = (RTFLOAT)0.004375 * RTMATH_DEGREE_TO_RAD;
         break;
 
     case LSM6DS33_FSR_245:
@@ -264,7 +264,7 @@ bool RTIMULSM6DS33LIS3MDL::setGyro()
 
     case LSM6DS33_FSR_1000:
         ctrl2_g |= 0x08;
-        m_gyroScale = (RTFLOAT)0.07 * RTMATH_DEGREE_TO_RAD;
+        m_gyroScale = (RTFLOAT)0.035 * RTMATH_DEGREE_TO_RAD;
         break;
 
     case LSM6DS33_FSR_2000:
@@ -418,17 +418,17 @@ bool RTIMULSM6DS33LIS3MDL::setAccel()
 
     case LSM6DS33_ACCEL_FSR_16:
         ctrl1_xl |= (0x01<<2);
-        m_accelScale = (RTFLOAT)0.000122;
+        m_accelScale = (RTFLOAT)0.000488;
         break;
 
     case LSM6DS33_ACCEL_FSR_4:
         ctrl1_xl |= (0x10<<2);
-        m_accelScale = (RTFLOAT)0.000244;
+        m_accelScale = (RTFLOAT)0.000122;
         break;
 
     case LSM6DS33_ACCEL_FSR_8:
         ctrl1_xl |= (0x11<<2);
-        m_accelScale = (RTFLOAT)0.000732;
+        m_accelScale = (RTFLOAT)0.000244;
         break;
 
     default:
@@ -531,22 +531,22 @@ bool RTIMULSM6DS33LIS3MDL::setCompass()
     switch (m_settings->m_LSM6DS33LIS3MDLCompassFsr) {
     case LIS3MDL_COMPASS_FSR_4:
         ctrl2 = 0x00;
-        m_compassScale = (RTFLOAT)0.016;
+        m_compassScale = (RTFLOAT)0.01462;
         break;
 
     case LIS3MDL_COMPASS_FSR_8:
         ctrl2 = 0x20;
-        m_compassScale = (RTFLOAT)0.032;
+        m_compassScale = (RTFLOAT)0.02923;
         break;
 
     case LIS3MDL_COMPASS_FSR_12:
         ctrl2 = 0x40;
-        m_compassScale = (RTFLOAT)0.0479;
+        m_compassScale = (RTFLOAT)0.04384;
         break;
 
     case LIS3MDL_COMPASS_FSR_16:
         ctrl2 = 0x60;
-        m_compassScale = (RTFLOAT)0.0479;
+        m_compassScale = (RTFLOAT)0.05845;
         break;
 
     default:
@@ -818,28 +818,26 @@ bool RTIMULSM6DS33LIS3MDL::IMURead()
     RTMath::convertToVector(compassData, m_imuData.compass, m_compassScale, false);
 
     //  sort out gyro axes
-
     m_imuData.gyro.setX(m_imuData.gyro.x());
     m_imuData.gyro.setY(-m_imuData.gyro.y());
-    m_imuData.gyro.setZ(-m_imuData.gyro.z());
+    m_imuData.gyro.setZ(m_imuData.gyro.z());
 
     //  sort out accel data;
-
-    m_imuData.accel.setX(-m_imuData.accel.x());
+    m_imuData.accel.setX(m_imuData.accel.x());
+    m_imuData.accel.setY(m_imuData.accel.y());
+    m_imuData.accel.setZ(m_imuData.accel.z());
 
     //  sort out compass axes
-
-    //m_imuData.compass.setY(-m_imuData.compass.y());
-    //m_imuData.compass.setZ(-m_imuData.compass.z());
+    m_imuData.compass.setX(m_imuData.compass.x());
+    m_imuData.compass.setY(m_imuData.compass.y());
+    m_imuData.compass.setZ(m_imuData.compass.z());
 
     //  now do standard processing
-
     handleGyroBias();
-    //calibrateAverageCompass();
+    calibrateAverageCompass();
     calibrateAccel();
 
     //  now update the filter
-
     updateFusion();
 
     return true;
