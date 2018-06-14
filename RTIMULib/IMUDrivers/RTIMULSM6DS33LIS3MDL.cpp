@@ -89,6 +89,34 @@ bool RTIMULSM6DS33LIS3MDL::IMUInit()
         }
     }
 
+    
+    // work out compass address
+    if (!m_settings->HALRead(LIS3MDL_ADDRESS0, LIS3MDL_WHO_AM_I, 1, &result, "Reading LIS3MDL WHO AM I on Addr0")) 
+    {
+        if (!m_settings->HALRead(LIS3MDL_ADDRESS1, LIS3MDL_WHO_AM_I, 1, &result, "Reading LIS3MDL WHO AM I on Addr1"))
+        {
+            return false;
+        } 
+        else 
+        {
+            if (result == LIS3MDL_ID) 
+            {
+                m_compassSlaveAddr = LIS3MDL_ADDRESS1;
+                std::cout << "Addr1 " << LIS3MDL_ADDRESS1 << std::endl;
+            }
+        }
+    } 
+    else 
+    {
+        if (result == LIS3MDL_ID) 
+        {
+            m_compassSlaveAddr = LIS3MDL_ADDRESS0;
+            std::cout << "Addr0 " << LIS3MDL_ADDRESS0 << std::endl;
+        }
+    }
+
+
+
     setCalibrationData();
 
     //  enable the I2C bus
@@ -108,18 +136,6 @@ bool RTIMULSM6DS33LIS3MDL::IMUInit()
         std::cout << "Set LSM6DS33 automatic register address increment" << std::endl;
     } 
 
-    //if (!m_settings->HALWrite(m_gyroAccelSlaveAddr, LSM6DS33_CTRL3_C, 0x84, "Failed to boot LSM6DS33"))
-    //    return false;
-
-    if (!m_settings->HALRead(m_gyroAccelSlaveAddr, LSM6DS33_WHO_AM_I, 1, &result, "Failed to read LSM6DS33 id"))
-        return false;
-
-    if (result != LSM6DS33_ID) {
-        HAL_ERROR1("Incorrect LSM6DS33 id %d\n", result);
-        HAL_ERROR1("LSM6DS33 true id is %d\n", LSM6DS33_ID);
-        return false;
-    }
-
     if (!setGyro())
         return false;
     
@@ -131,7 +147,7 @@ bool RTIMULSM6DS33LIS3MDL::IMUInit()
     }
 
     //  Set up the compass
-
+    std::cout << "Trying to read from compassSlaveAddr: " << static_cast<unsigned>(m_compassSlaveAddr) << std::endl;
     if (!m_settings->HALRead(m_compassSlaveAddr, LIS3MDL_WHO_AM_I, 1, &result, "Failed to read LIS3MDL id"))
         return false;
 
@@ -460,7 +476,7 @@ bool RTIMULSM6DS33LIS3MDL::setAccel()
     // LPF2_XL_EN, HPCF_XL1, HPCF_XL0, 0, 0, HP_SLOPE_XL_EN, 0, LOW_PASS_ON_6D
     unsigned char ctrl8_xl = (LPF2_XL_EN<<7) | (accelHpf<<5) | (HP_SLOPE_XL_EN<<2) | (HP_SLOPE_XL_EN<<0) | 0x00;
 
-    std::cout << "Writing LSM6DS33 CTRL8_XL: " << std::hex << static_cast<unsigned>(ctrl8_xl) << std::endl;
+    std::cout << "Writing LSM6DS33 CTRL8_XL: " << static_cast<unsigned>(ctrl8_xl) << std::endl;
 
     if (!m_settings->HALWrite(m_gyroAccelSlaveAddr, LSM6DS33_CTRL8_XL, ctrl8_xl, "Failed to set LSM6DS33 CTRL8_XL"))
         return false;
@@ -475,17 +491,77 @@ bool RTIMULSM6DS33LIS3MDL::setCompass()
 
     // OM = 11 (ultra-high-performance mode for X and Y); DO = 100 (10 Hz ODR)
     //write_reg(LIS3MDL_CTRL_REG1, 0b01110000);
-    if (!m_settings->HALWrite(m_compassSlaveAddr, LIS3MDL_CTRL1, 0b01110000, "Failed to set LIS3MDL CTRL1"))
+    //if (!m_settings->HALWrite(m_compassSlaveAddr, LIS3MDL_CTRL1, 0b01110000, "Failed to set LIS3MDL CTRL1"))
+    //    return false;
+
+
+    unsigned char ctrl1;
+
+    unsigned char OM = 0b01100000;
+    ctrl1 = OM;
+
+    if ((m_settings->m_LSM6DS33LIS3MDLCompassSampleRate < 0) || (m_settings->m_LSM6DS33LIS3MDLCompassSampleRate > 7)) {
+        HAL_ERROR1("Illegal LIS3MDL compass sample rate code %d\n", m_settings->m_LSM6DS33LIS3MDLCompassSampleRate);
         return false;
+    }
+
+    ctrl1 |= (m_settings->m_LSM6DS33LIS3MDLCompassSampleRate << 2);
+
+#ifdef LSM6DS33LIS3MDL_CACHE_MODE
+    //  enable fifo
+
+    //ctrl1 |= 0x40; incorrect register, check datasheet if requried
+#endif
+
+    if (!m_settings->HALWrite(m_compassSlaveAddr,  LIS3MDL_CTRL1, ctrl1, "Failed to set LIS3MDL CTRL1"))
+    {
+        return false;
+    }
+
 
     // FS = 00 (+/- 4 gauss full scale)
     //write_reg(LIS3MDL_CTRL2, 0b00000000);
-    if (!m_settings->HALWrite(m_compassSlaveAddr, LIS3MDL_CTRL2, 0b00000000, "Failed to set LIS3MDL CTRL2"))
+    //if (!m_settings->HALWrite(m_compassSlaveAddr, LIS3MDL_CTRL2, 0b00000000, "Failed to set LIS3MDL CTRL2"))
+    //    return false;
+
+    unsigned char ctrl2;
+
+    //  convert FSR to uT
+
+    switch (m_settings->m_LSM6DS33LIS3MDLCompassFsr) {
+    case LIS3MDL_COMPASS_FSR_4:
+        ctrl2 = 0x00;
+        m_compassScale = (RTFLOAT)0.016;
+        break;
+
+    case LIS3MDL_COMPASS_FSR_8:
+        ctrl2 = 0x20;
+        m_compassScale = (RTFLOAT)0.032;
+        break;
+
+    case LIS3MDL_COMPASS_FSR_12:
+        ctrl2 = 0x40;
+        m_compassScale = (RTFLOAT)0.0479;
+        break;
+
+    case LIS3MDL_COMPASS_FSR_16:
+        ctrl2 = 0x60;
+        m_compassScale = (RTFLOAT)0.0479;
+        break;
+
+    default:
+        HAL_ERROR1("Illegal LIS3MDL compass FSR code %d\n", m_settings->m_LSM6DS33LIS3MDLCompassFsr);
         return false;
+    }
+
+    if (!m_settings->HALWrite(m_compassSlaveAddr,  LIS3MDL_CTRL2, ctrl2, "Failed to set LIS3MDL CTRL2"))
+    {
+        return false;
+    }
 
     // MD = 00 (continuous-conversion mode)
     //write_reg(LIS3MDL_CTRL3, 0b00000000);
-    if (!m_settings->HALWrite(m_compassSlaveAddr, LIS3MDL_CTRL3, 0b00000000, "Failed to set LIS3MDL CTRL3"))
+    if (!m_settings->HALWrite(m_compassSlaveAddr, LIS3MDL_CTRL3, 0x00, "Failed to set LIS3MDL CTRL3"))
         return false;
 
     // OMZ = 11 (ultra-high-performance mode for Z)
@@ -724,10 +800,10 @@ bool RTIMULSM6DS33LIS3MDL::IMURead()
     << "; Z " << static_cast<int16_t>(accelData[4] | accelData[5] << 8) << std::endl;
     */
 
-    //if (!m_settings->HALRead(m_compassSlaveAddr, 0x08 | LIS3MDL_OUT_X_L, 6, compassData, "Failed to read LIS3MDL compass data"))
-    //    return false;
+    if (!m_settings->HALRead(m_compassSlaveAddr, 0x80 | LIS3MDL_OUT_X_L, 6, compassData, "Failed to read LIS3MDL compass data"))
+        return false;
  
-    /*
+    /* 
     std::cout << "Compass Data: "
     << "  X " << static_cast<int16_t>(compassData[0] | compassData[1] << 8) 
     << "; Y " << static_cast<int16_t>(compassData[2] | compassData[3] << 8)
