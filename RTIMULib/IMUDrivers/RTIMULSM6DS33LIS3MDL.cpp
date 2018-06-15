@@ -566,6 +566,7 @@ bool RTIMULSM6DS33LIS3MDL::setCompass()
 
     // OMZ = 11 (ultra-high-performance mode for Z)
     //write_reg(LIS3MDL_CTRL4, 0b00001100);
+    //if (!m_settings->HALWrite(m_compassSlaveAddr, LIS3MDL_CTRL4, 0b00001100, "Failed to set LIS3MDL CTRL4"))
     if (!m_settings->HALWrite(m_compassSlaveAddr, LIS3MDL_CTRL4, 0b00001100, "Failed to set LIS3MDL CTRL4"))
         return false;
     
@@ -781,12 +782,12 @@ bool RTIMULSM6DS33LIS3MDL::IMURead()
     if (!m_settings->HALRead(m_gyroAccelSlaveAddr, LSM6DS33_OUTX_L_G, 6, gyroData, "Failed to read LSM6DS33 data"))
         return false;
 
-    /*
+    
     std::cout << "Gyro Data: "
-    << "  X " << static_cast<int16_t>(gyroData[0] | gyroData[1] << 8) 
-    << "; Y " << static_cast<int16_t>(gyroData[2] | gyroData[3] << 8)
-    << "; Z " << static_cast<int16_t>(gyroData[4] | gyroData[5] << 8) << std::endl;
-    */
+    << "  X " << static_cast<int16_t>(gyroData[0] | gyroData[1] << 8) * m_gyroScale 
+    << "; Y " << static_cast<int16_t>(gyroData[2] | gyroData[3] << 8) * m_gyroScale
+    << "; Z " << static_cast<int16_t>(gyroData[4] | gyroData[5] << 8) * m_gyroScale << std::endl;
+    
 
     m_imuData.timestamp = RTMath::currentUSecsSinceEpoch();
 
@@ -819,18 +820,18 @@ bool RTIMULSM6DS33LIS3MDL::IMURead()
 
     //  sort out gyro axes
     m_imuData.gyro.setX(m_imuData.gyro.x());
-    m_imuData.gyro.setY(-m_imuData.gyro.y());
+    m_imuData.gyro.setY(m_imuData.gyro.y());
     m_imuData.gyro.setZ(m_imuData.gyro.z());
 
     //  sort out accel data;
     m_imuData.accel.setX(m_imuData.accel.x());
     m_imuData.accel.setY(m_imuData.accel.y());
-    m_imuData.accel.setZ(m_imuData.accel.z());
+    m_imuData.accel.setZ(-m_imuData.accel.z());
 
     //  sort out compass axes
     m_imuData.compass.setX(m_imuData.compass.x());
     m_imuData.compass.setY(m_imuData.compass.y());
-    m_imuData.compass.setZ(m_imuData.compass.z());
+    m_imuData.compass.setZ(-m_imuData.compass.z());
 
     //  now do standard processing
     handleGyroBias();
