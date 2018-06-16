@@ -782,12 +782,12 @@ bool RTIMULSM6DS33LIS3MDL::IMURead()
     if (!m_settings->HALRead(m_gyroAccelSlaveAddr, LSM6DS33_OUTX_L_G, 6, gyroData, "Failed to read LSM6DS33 data"))
         return false;
 
-    
+    /*
     std::cout << "Gyro Data: "
     << "  X " << static_cast<int16_t>(gyroData[0] | gyroData[1] << 8) * m_gyroScale 
     << "; Y " << static_cast<int16_t>(gyroData[2] | gyroData[3] << 8) * m_gyroScale
     << "; Z " << static_cast<int16_t>(gyroData[4] | gyroData[5] << 8) * m_gyroScale << std::endl;
-    
+    */
 
     m_imuData.timestamp = RTMath::currentUSecsSinceEpoch();
 
@@ -825,12 +825,12 @@ bool RTIMULSM6DS33LIS3MDL::IMURead()
 
     //  sort out accel data;
     m_imuData.accel.setX(m_imuData.accel.x());
-    m_imuData.accel.setY(m_imuData.accel.y());
+    m_imuData.accel.setY(-m_imuData.accel.y());
     m_imuData.accel.setZ(-m_imuData.accel.z());
 
     //  sort out compass axes
     m_imuData.compass.setX(m_imuData.compass.x());
-    m_imuData.compass.setY(m_imuData.compass.y());
+    m_imuData.compass.setY(-m_imuData.compass.y());
     m_imuData.compass.setZ(-m_imuData.compass.z());
 
     //  now do standard processing
