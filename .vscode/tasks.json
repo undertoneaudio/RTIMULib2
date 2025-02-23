@@ -1,0 +1,53 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+        {
+			"label": "Build RTIMULib2 - Calc",
+			"type": "shell",
+			"command": "cmake",
+			"args": [
+				"--build",
+				"${command:cmake.buildDirectory}",
+				"--config",
+				"${command:cmake.buildType}",
+				"--target",
+				"all",
+				"-j",
+				"$(nproc)",
+			],
+			"problemMatcher": [
+				"$gcc"
+			],
+			"dependsOn": "Configure RTIMULib2",
+			"group": {
+				"kind": "build",
+				"isDefault": false
+			}
+		},
+        {
+			"label": "Configure RTIMULib2",
+			"type": "shell",
+			"command": "cmake",
+			"args": [
+                "-DBUILD_GL=ON",
+                "-DQT5=ON",
+                "-DBUILD_DRIVE=ON",
+                "-DBUILD_DRIVE10=ON",
+                "-DBUILD_DRIVE11=ON",
+                "-DBUILD_CAL=ON",
+                "-DBUILD_DEMO=ON",                
+				"-S",
+				"${workspaceRoot}/Linux/",
+				"-B",
+				"${command:cmake.buildDirectory}"
+			],
+			"problemMatcher": [
+				"$gcc"
+			],
+			"group": {
+				"kind": "build",
+				"isDefault": false
+			}
+		},
+    ]
+}
